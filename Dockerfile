@@ -1,0 +1,9 @@
+FROM python:3.11.3-buster
+ENV FLASK_APP=classifier.py
+RUN apt-get update && apt-get install ffmpeg libsm6 libxext6  -y
+COPY . /app
+WORKDIR /app
+RUN pip install -r requirements.txt
+EXPOSE 8080
+ENTRYPOINT [ "flask" ]
+CMD [ "run","--port","8080","--host","0.0.0.0" ]
