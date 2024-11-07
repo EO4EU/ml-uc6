@@ -134,7 +134,7 @@ update_helm:
     - dagger call update
       --gitlab $GITLAB
       --service $SERVICE
-      --repo $REPO
+      --repo $REPO-test
       --username $CI_COOKIECUTTER_USERNAME
       --password env:CI_COOKIECUTTER_PASSWORD
       --wkd .
