@@ -1,6 +1,6 @@
 default_context:
   chart_name: "uc6"
-  chart_version: "0.1.10"
+  chart_version: "0.1.11"
   need_dep_chart: "no"
   include_service: "yes"
   service_image_repo: "registry.apps.eo4eu.eu/ffornari/uc6/eo4eu-classifier"

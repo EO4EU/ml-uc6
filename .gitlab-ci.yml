@@ -54,8 +54,6 @@
     - "git clone -b $HELM_BRANCH \
       https://$CI_HELM_USERNAME:$CI_HELM_PASSWORD@$GITLAB/$NAMESPACE/$HELM.git"
     - "export TAG=$(git -C $REPO rev-parse HEAD)"
-    - "sed -i 's/\\(  service_image_tag: \"\\)\\(.*\\)/\\1'\"$TAG\"'\"/g' \
-      $REPO/cookiecutter-config.yaml"
 build_image:
   extends: [.dagger]
   tags: [dagger]
@@ -131,6 +129,10 @@ update_helm:
     untracked: true
   script:
     - cd $REPO
+    - |
+      if git diff --name-only HEAD~1 | grep -Eq '^(Dockerfile|classifier\.py|requirements\.txt)$'; then
+        sed -i 's/\(  service_image_tag: "\)\(.*\)/\1'"$TAG"'"/g' cookiecutter-config.yaml
+      fi
     - dagger call update
       --gitlab $GITLAB
       --service $SERVICE
