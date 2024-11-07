@@ -28,18 +28,53 @@ from dagger import Doc, dag, function, object_type
 @object_type
 class Uc6:
     @function
+    def registry(
+        self,
+        bucket: Annotated[str, Doc("S3 Bucket")],
+        endpoint: Annotated[str, Doc("S3 Endpoint")],
+        accesskey: Annotated[str, Doc("S3 Access Key")],
+        secretkey: Annotated[str, Doc("S3 Secret Key")]
+    ) -> dagger.Service:
+        """Start and return a registry service."""
+        return (
+            dag.container()
+            .from_("registry:2")
+            .with_env_variable("REGISTRY_HTTP_ADDR", "0.0.0.0:80")
+            .with_env_variable("REGISTRY_HTTP_SECRET", secretkey)
+            .with_env_variable("REGISTRY_STORAGE", "s3")
+            .with_env_variable("REGISTRY_STORAGE_S3_REGION", "default")
+            .with_env_variable("REGISTRY_STORAGE_S3_BUCKET", bucket)
+            .with_env_variable("REGISTRY_STORAGE_S3_REGIONENDPOINT", endpoint)
+            .with_env_variable("REGISTRY_STORAGE_S3_ACCESSKEY", accesskey)
+            .with_env_variable("REGISTRY_STORAGE_S3_SECRETKEY", secretkey)
+            .with_exposed_port(80)
+            .as_service()
+        )
+
+    @function
     async def build(
         self,
+        bucket: Annotated[str, Doc("S3 Bucket")],
+        endpoint: Annotated[str, Doc("S3 Endpoint")],
+        access: Annotated[dagger.Secret, Doc("S3 Access Key")],
+        secret: Annotated[dagger.Secret, Doc("S3 Secret Key")],
+        repo: Annotated[str, Doc("Registry repo")],
         tag: Annotated[str, Doc("Image tag")],
         wkd: Annotated[
             dagger.Directory,
             Doc("Location of directory containing Dagger files"),
         ],
-    ) -> dagger.Directory:
+    ) -> str:
         """Build and publish image from existing Dockerfile"""
+        accesskey = await access.plaintext()
+        secretkey = await secret.plaintext()
         return await (
             dag.container()
             .from_("gcr.io/kaniko-project/executor:debug")
+            .with_service_binding(
+                "registry.local",
+                self.registry(bucket, endpoint, accesskey, secretkey)
+            )            
             .with_mounted_directory("/workspace", wkd)
             .with_exec(
                 [
@@ -48,19 +83,24 @@ class Uc6:
                     "dir:///workspace/",
                     "--dockerfile",
                     "/workspace/Dockerfile",
-                    "--no-push",
-                    "--oci-layout-path",
-                    f"/workspace/{tag}"
+                    "--insecure",
+                    "--destination",
+                    f"registry.local/{repo}:{tag}"
                 ]
             )
-            .directory(f"/workspace/{tag}")
+            .stdout()
         )
     
     @function
     async def scan(
         self,
+        bucket: Annotated[str, Doc("S3 Bucket")],
+        endpoint: Annotated[str, Doc("S3 Endpoint")],
+        access: Annotated[dagger.Secret, Doc("S3 Access Key")],
+        secret: Annotated[dagger.Secret, Doc("S3 Secret Key")],
         severity: Annotated[str, Doc("Severity level")],
         exit: Annotated[str, Doc("Exit code")],
+        repo: Annotated[str, Doc("Registry repo")],
         tag: Annotated[str, Doc("Image tag")],
         wkd: Annotated[
             dagger.Directory,
@@ -68,6 +108,8 @@ class Uc6:
         ],
     ) -> dagger.File:
         """Scan image to detect vulnerabilities"""
+        accesskey = await access.plaintext()
+        secretkey = await secret.plaintext()
         template = (
             dag.container()
             .from_("alpine:latest")
@@ -82,6 +124,10 @@ class Uc6:
         )
         return await (
             dag.trivy().base()
+            .with_service_binding(
+                "registry.local",
+                self.registry(bucket, endpoint, accesskey, secretkey)
+            )
             .with_directory("/src", wkd)
             .with_file("/src/html.tpl", template.file("/src/html.tpl"))
             .with_exec(
@@ -102,8 +148,8 @@ class Uc6:
                     "@/src/html.tpl",
                     "--output",
                     f"/src/vulnerabilities.html",
-                    "--input",
-                    f"/src/{tag}"
+                    "--insecure",
+                    f"registry.local/{repo}:{tag}"
                 ]
             )
             .file(f"/src/vulnerabilities.html")
