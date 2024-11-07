@@ -100,7 +100,7 @@ push_image:
   extends: [.dagger]
   tags: [dagger]
   stage: deploy
-  needs: [query_api]
+  needs: [scan_image]
   script:
     - cd $REPO
     - |
