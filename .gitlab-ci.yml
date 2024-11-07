@@ -132,6 +132,11 @@ update_helm:
     - |
       if git diff --name-only HEAD~1 | grep -Eq '^(Dockerfile|classifier\.py|requirements\.txt)$'; then
         sed -i 's/\(  service_image_tag: "\)\(.*\)/\1'"$TAG"'"/g' cookiecutter-config.yaml
+        git config user.email "federico.fornari@ecmwf.int"
+        git config user.name "Cookiecutter"
+        git add --all
+        git commit -m "Updated image tag by Cookiecutter" || true
+        git push
       fi
     - dagger call update
       --gitlab $GITLAB
@@ -159,5 +164,5 @@ sync_helm:
     - git config user.email "federico.fornari@ecmwf.int"
     - git config user.name "Cookiecutter"
     - git add --all
-    - git commit -m "New commit from Cookiecutter" || true
+    - git commit -m "Updated helm chart by Cookiecutter" || true
     - git push
