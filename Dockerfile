@@ -1,6 +1,11 @@
 FROM python:3.11.10-bookworm
 ENV FLASK_APP=classifier.py
-RUN apt-get update && apt-get install ffmpeg libsm6 libxext6 libgdal-dev -y
+RUN apt-get update && \
+    apt-get install -y \
+    ffmpeg \
+    libsm6 \
+    libxext6 \
+    libgdal-dev
 COPY . /app
 WORKDIR /app
 RUN pip install -r requirements.txt

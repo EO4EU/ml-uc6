@@ -143,6 +143,7 @@ sync_helm:
     untracked: true
   script:
     - rm -rf $HELM/$SERVICE
+    - mkdir -p $HELM/$SERVICE
     - cp -r /builds/$NAMESPACE/$REPO/$SERVICE-helm $HELM/$SERVICE/$REPO
     - cd $HELM
     - git config user.email "federico.fornari@ecmwf.int"
