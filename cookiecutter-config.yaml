@@ -1,6 +1,6 @@
 default_context:
   chart_name: "uc6-test"
-  chart_version: "0.1.4"
+  chart_version: "0.1.5"
   need_dep_chart: "no"
   include_service: "yes"
   service_image_repo: "registry.apps.eo4eu.eu/ffornari/uc6/eo4eu-classifier"
@@ -8,7 +8,7 @@ default_context:
   service_image_pull_policy: "Always"
   service_image_secret: "uc6-registry"
   service_container_port: "8080"
-  service_request_cpu: "0.1"
+  service_request_cpu: "100m"
   service_request_memory: "4G"
   service_limit_cpu: "1"
   service_limit_memory: "16G"
