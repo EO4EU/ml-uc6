@@ -242,7 +242,7 @@ class Uc6:
                     "cookiecutter-config.yaml",
                     "--checkout",
                     f"{service}",
-                    f"https://{username}:{token}@{gitlab}/{username}/cookiecutter-helm-template.git"
+                    f"https://{username}:{token}@{gitlab}/eo4eu/eo4eu-cicd/cicd-infra/cookiecutter-helm-template.git"
                 ]
             )
             .directory(f"/src/{repo}")
