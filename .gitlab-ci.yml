@@ -37,12 +37,6 @@
     - "export CI_HELM_PASSWORD=$(curl -s -H \"$BEARER\" \
       \"$VAULT_SERVER_URL/v1/kv/data/gitlab_credentials/$HELM\" | \
       jq -r '.data.data.password')"
-    - "export CI_REGISTRY_USERNAME=$(curl -s -H \"$BEARER\" \
-      \"$VAULT_SERVER_URL/v1/kv/data/registry_credentials/$SERVICE/$REPO\" | \
-      jq -r '.data.data.username')"
-    - "export CI_REGISTRY_PASSWORD=$(curl -s -H \"$BEARER\" \
-      \"$VAULT_SERVER_URL/v1/kv/data/registry_credentials/$SERVICE/$REPO\" | \
-      jq -r '.data.data.password')"
     - "export S3_ACCESS_KEY=$(curl -s -H \"$BEARER\" \
       \"$VAULT_SERVER_URL/v1/kv/data/flux_dev_minio\" | \
       jq -r '.data.data.s3_access_key')"
@@ -133,8 +127,8 @@ push_image:
         --repo $REPO \
         --app $APP \
         --tag $TAG \
-        --username $CI_REGISTRY_USERNAME \
-        --password env:CI_REGISTRY_PASSWORD \
+        --username $CI_REPO_USERNAME \
+        --password env:CI_REPO_PASSWORD \
         --wkd .
       fi
 update_helm:
@@ -197,3 +191,14 @@ sync_helm:
     - git add --all
     - git commit -m "Updated helm chart by Cookiecutter" || true
     - git push
+clean_registry:
+  extends: [.dagger]
+  tags: [dagger]
+  stage: .post
+  script:
+    - cd $REPO
+    - dagger call clean
+      --bucket $BUCKET
+      --endpoint https://$MINIO
+      --access env:S3_ACCESS_KEY
+      --secret env:S3_SECRET_KEY

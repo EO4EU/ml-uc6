@@ -247,3 +247,33 @@ class Uc6:
             )
             .directory(f"/src/{repo}")
         )
+
+    @function
+    async def clean(
+        self,
+        bucket: Annotated[str, Doc("S3 Bucket")],
+        endpoint: Annotated[str, Doc("S3 Endpoint")],
+        access: Annotated[dagger.Secret, Doc("S3 Access Key")],
+        secret: Annotated[dagger.Secret, Doc("S3 Secret Key")],
+    ) -> str:
+        """Clean local registry."""
+        accesskey = await access.plaintext()
+        secretkey = await secret.plaintext()
+        return await (
+            dag.container()
+            .from_("amazon/aws-cli")
+            .with_env_variable("AWS_ACCESS_KEY_ID", accesskey)
+            .with_env_variable("AWS_SECRET_ACCESS_KEY", secretkey)
+            .with_exec(
+                [
+                    "aws",
+                    "--endpoint-url",
+                    f"{endpoint}",
+                    "s3",
+                    "rm",
+                    f"s3://{bucket}",
+                    "--recursive"
+                ]
+            )
+            .stdout()
+        )
