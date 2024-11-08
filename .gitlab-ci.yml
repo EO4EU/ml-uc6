@@ -4,7 +4,8 @@
     MINIO: minio.dev.wekeo.apps.eo4eu.eu
     BUCKET: registry
     GITLAB: git.apps.eo4eu.eu
-    NAMESPACE: ffornari
+    REPO_NAMESPACE: eo4eu/eo4eu-cicd/eo4eu-inference-server
+    HELM_NAMESPACE: eo4eu/eo4eu-cicd/cicd-infra
     REGISTRY: registry.apps.eo4eu.eu
     REPO: uc6
     APP: eo4eu-classifier
@@ -44,9 +45,9 @@
       \"$VAULT_SERVER_URL/v1/kv/data/flux_dev_minio\" | \
       jq -r '.data.data.s3_secret_key')"
     - "git clone -b $REPO_BRANCH \
-      https://$CI_REPO_USERNAME:$CI_REPO_PASSWORD@$GITLAB/$NAMESPACE/$REPO.git"
+      https://$CI_REPO_USERNAME:$CI_REPO_PASSWORD@$GITLAB/$REPO_NAMESPACE/$REPO.git"
     - "git clone -b $HELM_BRANCH \
-      https://$CI_HELM_USERNAME:$CI_HELM_PASSWORD@$GITLAB/$NAMESPACE/$HELM.git"
+      https://$CI_HELM_USERNAME:$CI_HELM_PASSWORD@$GITLAB/$HELM_NAMESPACE/$HELM.git"
     - "export TAG=$(git -C $REPO rev-parse HEAD)"
 update_domain:
   extends: [.dagger]
@@ -104,10 +105,10 @@ scan_image:
         --exit 0 \
         --repo $REPO \
         --tag $TAG \
-        --wkd /builds/$NAMESPACE/$REPO \
+        --wkd /builds/$REPO_NAMESPACE/$REPO \
         export \
         --path \
-        /builds/$NAMESPACE/$REPO/vulnerabilities.html
+        /builds/$REPO_NAMESPACE/$REPO/vulnerabilities.html
       fi
   artifacts:
     when: always
@@ -159,7 +160,7 @@ update_helm:
       --wkd .
       export
       --path
-      /builds/$NAMESPACE/$REPO/$SERVICE-helm
+      /builds/$REPO_NAMESPACE/$REPO/$SERVICE-helm
 sync_helm:
   extends: [.dagger]
   tags: [dagger]
@@ -171,7 +172,7 @@ sync_helm:
   script:
     - rm -rf $HELM/$SERVICE
     - mkdir -p $HELM/$SERVICE
-    - cp -r /builds/$NAMESPACE/$REPO/$SERVICE-helm $HELM/$SERVICE/$REPO
+    - cp -r /builds/$REPO_NAMESPACE/$REPO/$SERVICE-helm $HELM/$SERVICE/$REPO
     - cd $HELM
     - git config user.email "federico.fornari@ecmwf.int"
     - git config user.name "Cookiecutter"
