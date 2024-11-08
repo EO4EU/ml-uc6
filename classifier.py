@@ -279,7 +279,7 @@ def create_app():
       # outputs : The result of the inference.
       async def doInference(toInfer,log_function,min_value,max_value):
 
-            triton_client = httpclient.InferenceServerClient(url="default-inference.uc6.svc.cineca-inference-server.local", verbose=False,conn_timeout=10000000000,conn_limit=None,ssl=False)
+            triton_client = httpclient.InferenceServerClient(url="default-inference.uc6.svc.ecmwf-inference-server.local", verbose=False,conn_timeout=10000000000,conn_limit=None,ssl=False)
             nb_Created=0
             nb_InferenceDone=0
             nb_Postprocess=0
