@@ -53,6 +53,7 @@ update_domain:
   tags: [dagger]
   stage: .pre
   script:
+    - cd $REPO
     - | 
       if git diff HEAD~1 | grep -Eq '^(-  virtual_service_cluster_domain:)'; then
         export CLUSTER_DOMAIN=$(grep 'virtual_service_cluster_domain:' \
