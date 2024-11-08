@@ -4,7 +4,7 @@ default_context:
   need_dep_chart: "no"
   include_service: "yes"
   service_image_repo: "registry.apps.eo4eu.eu/ffornari/uc6/eo4eu-classifier"
-  service_image_tag: "be0d63d131312aa7c2bbdaa7f5c1ef11aa962884"
+  service_image_tag: "0628715d984705e92f30a1074e33b897239d4094"
   service_image_pull_policy: "Always"
   service_image_secret: "uc6-registry"
   service_container_port: "8080"
