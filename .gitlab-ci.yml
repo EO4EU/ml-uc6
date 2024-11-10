@@ -153,8 +153,8 @@ update_helm:
       fi
     - dagger call update
       --gitlab $GITLAB
-      --service $SERVICE
       --repo $REPO
+      --branch $SERVICE-uc
       --username $CI_COOKIECUTTER_USERNAME
       --password env:CI_COOKIECUTTER_PASSWORD
       --wkd .

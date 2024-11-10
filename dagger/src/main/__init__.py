@@ -218,8 +218,8 @@ class Uc6:
     async def update(
         self,
         gitlab: Annotated[str, Doc("Gitlab address")],
-        service: Annotated[str, Doc("Service branch")],
         repo: Annotated[str, Doc("Repository name")],
+        branch: Annotated[str, Doc("Service branch")],
         username: Annotated[str, Doc("Repository username")],
         password: Annotated[dagger.Secret, Doc("Repository password")],
         wkd: Annotated[
@@ -241,7 +241,7 @@ class Uc6:
                     "--config-file",
                     "cookiecutter-config.yaml",
                     "--checkout",
-                    f"{service}",
+                    f"{branch}",
                     f"https://{username}:{token}@{gitlab}/eo4eu/eo4eu-cicd/cicd-infra/cookiecutter-helm-template.git"
                 ]
             )
