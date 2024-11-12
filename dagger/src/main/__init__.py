@@ -190,9 +190,30 @@ class Uc6:
         )
 
     @function
+    async def encode(
+        self,
+        username: Annotated[str, Doc("Registry username")],
+        password: Annotated[dagger.Secret, Doc("Registry password")],
+    ) -> str:
+        token = await password.plaintext()
+        return await (
+            dag.container()
+            .from_("alpine:latest")
+            .with_exec(
+                [
+                    "/bin/sh",
+                    "-c",
+                    f"printf {username}:{token} | base64"
+                ]
+            )
+            .stdout()
+        )
+
+    @function
     async def push(
         self,
         registry: Annotated[str, Doc("Registry address")],
+        namespace: Annotated[str, Doc("Registry namespace")],
         repo: Annotated[str, Doc("Registry repo")],
         app: Annotated[str, Doc("Application name")],
         tag: Annotated[str, Doc("Image tag")],
@@ -204,14 +225,38 @@ class Uc6:
         ],
     ) -> str:
         """Build and publish image from existing Dockerfile"""
+        blob = await self.encode(username, password)
+        config = (
+            dag.container()
+            .from_("alpine:latest")
+            .with_env_variable("CI_REGISTRY", registry)
+            .with_env_variable("CI_BLOB", blob)
+            .with_exec(
+                [
+                    "/bin/sh",
+                    "-c",
+                    "echo '{\"auths\":{\"'$CI_REGISTRY'\":{\"auth\":\"'$CI_BLOB'\"}}}' | sed 's/ //g'"
+                ],
+                redirect_stdout="/tmp/config.json"
+            )
+        )
         return await (
             dag.container(platform=dagger.Platform("linux/amd64"))
-            .with_directory("/src", wkd)
-            .with_workdir("/src")
-            .directory("/src")
-            .docker_build()
-            .with_registry_auth(registry, username, password)
-            .publish(f"{registry}/{username}/{repo}/{app}:{tag}")
+            .from_("gcr.io/kaniko-project/executor:debug")
+            .with_file("/kaniko/.docker/config.json", config.file("/tmp/config.json"))
+            .with_directory("/kaniko/.docker", wkd)
+            .with_exec(
+                [
+                    "/kaniko/executor",
+                    "--context", 
+                    "dir:///kaniko/.docker/",
+                    "--dockerfile",
+                    "/kaniko/.docker/Dockerfile",
+                    "--destination",
+                    f"{registry}/{namespace}/{repo}/{app}:{tag}"
+                ]
+            )
+            .stdout()
         )
     
     @function

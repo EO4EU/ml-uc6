@@ -12,7 +12,7 @@
     SERVICE: inference-server
     HELM: helm-repo
     REPO_BRANCH: main
-    HELM_BRANCH: dev
+    HELM_BRANCH: main
   before_script:
     - "apk --no-cache add jq"
     - "export VAULT_TOKEN=$(curl -s -X PUT \
@@ -171,8 +171,8 @@ sync_helm:
     untracked: true
   script:
     - rm -rf $HELM/$SERVICE
-    - mkdir -p $HELM/$SERVICE
-    - cp -r /builds/$REPO_NAMESPACE/$REPO/$SERVICE-helm $HELM/$SERVICE/$REPO
+    - rm -rf $HELM/$SERVICE-$REPO
+    - cp -r /builds/$REPO_NAMESPACE/$REPO/$SERVICE-helm $HELM/$SERVICE-$REPO
     - cd $HELM
     - git config user.email "federico.fornari@ecmwf.int"
     - git config user.name "Cookiecutter"
