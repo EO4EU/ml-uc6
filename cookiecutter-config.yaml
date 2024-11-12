@@ -1,9 +1,9 @@
 default_context:
   chart_name: "uc6"
-  chart_version: "0.1.14"
+  chart_version: "0.1.15"
   need_dep_chart: "no"
   include_service: "yes"
-  service_image_repo: "registry.apps.eo4eu.eu/ffornari/uc6/eo4eu-classifier"
+  service_image_repo: "registry.apps.eo4eu.eu/eo4eu/eo4eu-cicd/eo4eu-inference-server/uc6/eo4eu-classifier"
   service_image_tag: "0628715d984705e92f30a1074e33b897239d4094"
   service_image_pull_policy: "Always"
   service_image_secret: "uc6-registry"
