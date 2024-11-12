@@ -126,6 +126,7 @@ push_image:
       if git diff --name-only HEAD~1 | grep -Eq '^(Dockerfile|classifier\.py|requirements\.txt)$'; then
         dagger call push \
         --registry $REGISTRY \
+        --namespace $REPO_NAMESPACE \
         --repo $REPO \
         --app $APP \
         --tag $TAG \
