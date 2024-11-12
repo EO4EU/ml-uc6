@@ -1,6 +1,6 @@
 default_context:
   chart_name: "uc6"
-  chart_version: "0.1.15"
+  chart_version: "0.1.16"
   need_dep_chart: "no"
   include_service: "yes"
   service_image_repo: "registry.apps.eo4eu.eu/eo4eu/eo4eu-cicd/eo4eu-inference-server/uc6/eo4eu-classifier"

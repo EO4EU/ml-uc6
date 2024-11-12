@@ -5,8 +5,7 @@ RUN apt-get update && \
     ffmpeg \
     libsm6 \
     libxext6 \
-    libgdal-dev \
-    && apt clean
+    libgdal-dev
 COPY . /app
 WORKDIR /app
 RUN pip install -r requirements.txt
