@@ -44,13 +44,23 @@ import functools
 
 import gc
 
+from KafkaHandler import KafkaHandler,DefaultContextFilter
+
 def create_app():
 
       app = Flask(__name__)
 
-      logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
-      kafka_logger = logging.getLogger('kafka')
-      kafka_logger.setLevel(logging.CRITICAL)
+      Producer=KafkaProducer(bootstrap_servers="kafka-external.dev.apps.eo4eu.eu:9092",value_serializer=lambda v: json.dumps(v).encode('utf-8'),key_serializer=str.encode)
+      handler = KafkaHandler(producer=Producer,source='ML.uc6.classifier')
+      console_handler = logging.StreamHandler()
+      console_handler.setLevel(logging.DEBUG)
+      filter = DefaultContextFilter()
+      app.logger.addFilter(filter)
+      app.logger.addHandler(handler)
+      app.logger.addHandler(console_handler)
+      app.logger.setLevel(logging.DEBUG)
+
+      app.logger.info("Starting up...", extra={'logName': 'startup'})
       # This is the entry point for the SSL model from Image to Feature service.
       # It will receive a message from the Kafka topic and then do the inference on the data.
       # The result will be sent to the next service.
@@ -72,12 +82,6 @@ def create_app():
       # ML : A json with the following fields:
       # need-to-resize : A boolean that indicate if the data need to be resized.
 
-      def log(outfile,message):
-            app.logger.warning(message)
-            if outfile is not None:
-                  timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
-                  outfile.write(timestamp+':'+message+'\n')
-
       @app.route('/<name>', methods=['POST'])
       def classifier(name):
             app.logger.warning('received request')
@@ -89,14 +93,14 @@ def create_app():
                   api_instance = client.CoreV1Api()
                   configmap_name = str(name)
                   configmap_namespace = 'uc6'
-                  app.logger.warning('Namespace '+str(configmap_namespace))
+                  app.logger.info('Namespace '+str(configmap_namespace), extra={'logName': 'namespace'})
                   api_response = api_instance.read_namespaced_config_map(configmap_name, configmap_namespace)
                   json_data_request = json.loads(request.data)
                   json_data_configmap =json.loads(str(api_response.data['jsonSuperviserRequest']))
                   bootstrapServers =api_response.data['bootstrapServers']
                   Producer=KafkaProducer(bootstrap_servers=bootstrapServers,value_serializer=lambda v: json.dumps(v).encode('utf-8'),key_serializer=str.encode)      
-                  app.logger.warning('Reading json data request'+str(json_data_request))
-                  app.logger.warning('Reading json data configmap'+str(json_data_configmap))
+                  app.logger.info('Reading json data request'+str(json_data_request), extra={'logName': 'json_data_request'})
+                  app.logger.info('Reading json data configmap'+str(json_data_configmap), extra={'logName': 'json_data_configmap'})
                   assert json_data_request['previous_component_end'] == 'True' or json_data_request['previous_component_end']
                   kafka_out = json_data_configmap['Topics']["out"]
                   s3_access_key = json_data_configmap['S3_bucket']['aws_access_key_id']
@@ -109,31 +113,26 @@ def create_app():
                   min_value= np.array([4.63616730e+02,-3.27219640e-11]).reshape(1,1,-1,1,1).astype(np.float32)
                   max_value= np.array([5.43290894e+02, 1.05710514e-01]).reshape(1,1,-1,1,1).astype(np.float32)
 
-                  log_function = functools.partial(log,None)
-
                   #min_value= np.array([-3.27219640e-11,4.63616730e+02]).reshape(1,1,-1,1,1).astype(np.float32)
                   #max_value= np.array([1.05710514e-01,5.43290894e+02]).reshape(1,1,-1,1,1).astype(np.float32)
 
                   def threadentry():
-                        app.logger.warning('All json data read')
+                        app.logger.info('All json data read', extra={'logName': 'json_data_read'})
 
                         clientS3 = S3Client(aws_access_key_id=s3_access_key, aws_secret_access_key=s3_secret_key,endpoint_url=s3_region_endpoint)
                         clientS3.set_as_default_client()
 
-                        app.logger.warning('Client is ready')
+                        app.logger.info('Client is ready', extra={'logName': 'client_ready'})
 
                         
                         
                         cp = CloudPath("s3://"+s3_bucket_output+'/'+s3_path, client=clientS3)
                         cpOutput = CloudPath("s3://"+s3_bucket_output+'/result-uc6-classifier/')
-                        app.logger.warning("path is s3://"+s3_bucket_output+'/result-uc6-classifier/')
+                        app.logger.info("path is s3://"+s3_bucket_output+'/result-uc6-classifier/', extra={'logName': 'path'})
                         def fatalError(message):
-                              log_function(message)
-                              with cpOutput.joinpath('fatal.txt').open('w') as fileOutput:
-                                    fileOutput.write(message)
+                              app.logger.error(message, extra={'logName': 'fatalerror'})
 
                         with cpOutput.joinpath('log.txt').open('w') as fileOutput:
-                              log_function = functools.partial(log,fileOutput)
                               meta=None
                               def read_data(folder):
                                     with folder.open('rb') as fileBand, rasterio.io.MemoryFile(fileBand) as memfile:
@@ -198,10 +197,10 @@ def create_app():
                                           dic["i"]=i
                                           dic["j"]=j
                                           toInfer.append(dic)
-                              log_function('Starting inference')
-                              log_function('Number of data to infer '+str(len(toInfer)))
-                              asyncio.run(doInference(toInfer,log_function,min_value,max_value))
-                              log_function('Inference done')
+                              app.logger.info('Starting inference', extra={'logName': 'inference'})
+                              app.logger.info('Number of data to infer '+str(len(toInfer)), extra={'logName': 'inference'})
+                              asyncio.run(doInference(toInfer,min_value,max_value))
+                              app.logger.info('Inference done', extra={'logName': 'inference'})
                               for requestElem in toInfer:
                                     result_subarray=requestElem["result"]
                                     i=requestElem["i"]
@@ -237,14 +236,14 @@ def create_app():
 
                               outputPath=cpOutput.joinpath('classifier-result.tiff')
                               with outputPath.open('wb') as outputFile, rasterio.io.MemoryFile() as memfile:
-                                    log_function('height '+str(xshape)+' weight '+str(yshape))
-                                    log_function('type height '+str(type(xshape))+' type weight '+str(type(yshape)))
-                                    log_function('crs '+str(meta['crs']))
+                                    app.logger.info('height '+str(xshape)+' width '+str(yshape), extra={'logName': 'shape'})
+                                    app.logger.info('type height '+str(type(xshape))+' type width '+str(type(yshape)))
+                                    app.logger.info('crs '+str(meta['crs']), extra={'logName': 'crs'})
                                     with memfile.open(driver="GTiff",crs=meta['crs'],transform=meta['transform'],height=xshape,width=yshape,count=1,dtype=resultArray.dtype) as dst:
                                           dst.write(resultArray,1)
                                     outputFile.write(memfile.read())
                               
-                              log_function('Connecting to Kafka')
+                              app.logger.info('Connecting to Kafka', extra={'logName': 'kafka'})
 
                               response_json ={
                               "previous_component_end": "True",
@@ -261,9 +260,9 @@ def create_app():
                               })
 
             except Exception as e:
-                  app.logger.warning('Got exception '+str(e))
-                  app.logger.warning(traceback.format_exc())
-                  app.logger.warning('So we are ignoring the message')
+                  app.logger.error('Got exception '+str(e), extra={'logName': 'exception'})
+                  app.logger.error(traceback.format_exc(), extra={'logName': 'exception'})
+                  app.logger.info('So we are ignoring the message', extra={'logName': 'ignore'})
                   # HTTP answer that the message is malformed. This message will then be discarded only the fact that a sucess return code is returned is important.
                   response = make_response({
                   "msg": "There was a problem ignoring"
@@ -277,7 +276,7 @@ def create_app():
       # The result will be a json with the following fields:
       # model_name : The name of the model used.
       # outputs : The result of the inference.
-      async def doInference(toInfer,log_function,min_value,max_value):
+      async def doInference(toInfer,min_value,max_value):
 
             triton_client = httpclient.InferenceServerClient(url="default-inference.uc6.svc.ecmwf-inference-server.local", verbose=False,conn_timeout=10000000000,conn_limit=None,ssl=False)
             nb_Created=0
@@ -330,8 +329,8 @@ def create_app():
                               return (task,results)
                                     #toInfer[count]["result"]=results.as_numpy('probability')[0][0]
                   except Exception as e:
-                        log_function('Got exception '+str(e))
-                        log_function(traceback.format_exc())
+                        app.logger.error('Got exception '+str(e), extra={'logName': 'exception'})
+                        app.logger.error(traceback.format_exc(), extra={'logName': 'exception'})
                         nonlocal last_throw
                         last_throw=time.time()
                         return await consume(task)
@@ -380,10 +379,10 @@ def create_app():
                   nb_Created+=1
                   if time.time()-last_shown>60:
                         last_shown=time.time()
-                        log_function('done instance '+str(nb_done_instance)+'Inference done value '+str(nb_InferenceDone)+' postprocess done '+str(nb_Postprocess)+ ' created '+str(nb_Created))
+                        app.logger.info('done instance '+str(nb_done_instance)+'Inference done value '+str(nb_InferenceDone)+' postprocess done '+str(nb_Postprocess)+ ' created '+str(nb_Created), extra={'logName': 'progress'})
             while nb_InferenceDone-nb_Created>0 or nb_Postprocess-nb_InferenceDone>0:
                   await asyncio.sleep(0)
             await asyncio.gather(*list_task,*list_postprocess)
-            log_function('Inference done')
+            app.logger.info('Inference done', extra={'logName': 'inference'})
             await triton_client.close()
       return app
