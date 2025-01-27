@@ -1,5 +1,4 @@
 from flask import Flask, request, make_response
-import uuid
 import json
 import kubernetes
 from kubernetes import client, config
@@ -14,6 +13,11 @@ import tarfile
 import lzma
 import traceback
 import logging
+
+if sys.version_info >= (3, 12, 0):
+      import six
+      sys.modules['kafka.vendor.six.moves'] = six.moves
+
 
 from io import BytesIO
 
