@@ -7,7 +7,6 @@ from cloudpathlib import CloudPath
 from cloudpathlib import S3Client
 import tritonclient.http.aio as httpclient
 import numpy as np
-from kafka import KafkaProducer
 import os
 import tarfile
 import lzma
@@ -17,7 +16,7 @@ import logging
 if sys.version_info >= (3, 12, 0):
       import six
       sys.modules['kafka.vendor.six.moves'] = six.moves
-
+from kafka import KafkaProducer
 from io import BytesIO
 
 import pickle
