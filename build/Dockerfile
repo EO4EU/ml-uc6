@@ -1,4 +1,4 @@
-FROM python:3.11.10-bookworm
+FROM python:3.13.1-bookworm
 ENV FLASK_APP=classifier.py
 RUN apt-get update && \
     apt-get install \
