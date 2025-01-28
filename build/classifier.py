@@ -63,7 +63,7 @@ def create_app():
       app.logger.setLevel(logging.DEBUG)
 
       logger_app = logging.LoggerAdapter(app.logger, {'source': 'ML.uc6.classifier'},merge_extra=True)
-      logger_app.info("Application Starting up...", extra={'status': 'INFO'})
+      logger_app.info("Application Starting up...", extra={'status': 'DEBUG'})
 
       # This is the entry point for the SSL model from Image to Feature service.
       # It will receive a message from the Kafka topic and then do the inference on the data.
@@ -99,13 +99,13 @@ def create_app():
                   api_response = api_instance.read_namespaced_config_map(configmap_name, configmap_namespace)
                   json_data_request = json.loads(request.data)
                   json_data_configmap =json.loads(str(api_response.data['jsonSuperviserRequest']))
-                  workflow_name = json_data_request.get('workflow_name', '')
+                  workflow_name = json_data_configmap.get('workflow_name', '')
                   bootstrapServers =api_response.data['bootstrapServers']
                   Producer=KafkaProducer(bootstrap_servers=bootstrapServers,value_serializer=lambda v: json.dumps(v).encode('utf-8'),key_serializer=str.encode)
                   logger_workflow = logging.LoggerAdapter(logger_app, {'workflow_name': workflow_name,'producer':Producer},merge_extra=True)
                   logger_workflow.info('Starting Workflow',extra={'status':'START'})
-                  logger_workflow.info('Reading json data request'+str(json_data_request), extra={'status': 'INFO'})
-                  logger_workflow.info('Reading json data configmap'+str(json_data_configmap), extra={'status': 'INFO'})
+                  logger_workflow.info('Reading json data request'+str(json_data_request), extra={'status': 'DEBUG'})
+                  logger_workflow.info('Reading json data configmap'+str(json_data_configmap), extra={'status': 'DEBUG'})
                   if not(json_data_request['previous_component_end'] == 'True' or json_data_request['previous_component_end']):
                         class PreviousComponentEndException(Exception):
                               pass
@@ -126,155 +126,158 @@ def create_app():
                   #max_value= np.array([1.05710514e-01,5.43290894e+02]).reshape(1,1,-1,1,1).astype(np.float32)
 
                   def threadentry():
-                        logger_workflow.info('All json data read', extra={'status': 'INFO'})
+                        try:
+                              logger_workflow.info('All json data read', extra={'status': 'INFO'})
 
-                        clientS3 = S3Client(aws_access_key_id=s3_access_key, aws_secret_access_key=s3_secret_key,endpoint_url=s3_region_endpoint)
-                        clientS3.set_as_default_client()
+                              clientS3 = S3Client(aws_access_key_id=s3_access_key, aws_secret_access_key=s3_secret_key,endpoint_url=s3_region_endpoint)
+                              clientS3.set_as_default_client()
 
-                        logger_workflow.info('Client is ready', extra={'status': 'INFO'})
+                              logger_workflow.info('Client is ready', extra={'status': 'INFO'})
 
-                        
-                        
-                        cp = CloudPath("s3://"+s3_bucket_output+'/'+s3_path, client=clientS3)
-                        cpOutput = CloudPath("s3://"+s3_bucket_output+'/result-uc6-classifier/')
-                        logger_workflow.info("path is s3://"+s3_bucket_output+'/result-uc6-classifier/', extra={'status': 'INFO'})
-                        def fatalError(message):
-                              logger_workflow.error(message, extra={'status': 'CRITICAL'})
-
-                        with cpOutput.joinpath('log.txt').open('w') as fileOutput:
-                              meta=None
-                              def read_data(folder):
-                                    with folder.open('rb') as fileBand, rasterio.io.MemoryFile(fileBand) as memfile:
-                                          with memfile.open(driver="GTiff",sharing=False) as band_file:
-                                                nonlocal meta
-                                                meta=band_file.meta
-                                                result=band_file.read()
-                                                return result
                               
-                              array=[]
-                              listName=[]
-                              for folder in cp.iterdir():
-                                    if folder.name.endswith('.tiff') or folder.name.endswith('.tif'):
-                                          listName.append(folder)
-                              for folder in listName[-4:]:
-                                    array.append(read_data(folder))
-                              nparray=np.stack(array)
-                              shapeArray=nparray.shape
-                              xshape=shapeArray[2]
-                              yshape=shapeArray[3]
-                              nparray=np.expand_dims(nparray.astype(np.float32),axis=0)
-                              resultArray=np.zeros([xshape,yshape],dtype=np.float32)
-                              count=np.zeros([xshape,yshape],dtype=np.float32)
-                              if shapeArray[0]!=4:
-                                    fatalError('Invalid input shape, got '+str(shapeArray) + ' instead of (4,x,y). This is likely due to the fact that not enough tiff files are present in the folder. 4 are needed. Exiting.')
-                                    return
-                              toInfer=[]
-                              for i in range(0,xshape-11,2):
-                                    for j in range(0,yshape-11,2):
-                                          #subarray=nparray[:,:,[0,2],i:i+12,j:j+12]
-                                          dic={}
-                                          #dic["data"]=(np.expand_dims(subarray.astype(np.float32),axis=0)-min_value)/(max_value-min_value)
-                                          dic["data"]=nparray
-                                          dic["i"]=i
-                                          dic["j"]=j
-                                          toInfer.append(dic)
-                                    if yshape%12!=0:
-                                          j=yshape-12
-                                          #subarray=nparray[:,:,[0,2],i:i+12,j:yshape]
-                                          dic={}
-                                          #dic["data"]=(np.expand_dims(subarray.astype(np.float32),axis=0)-min_value)/(max_value-min_value)
-                                          dic["data"]=nparray
-                                          dic["i"]=i
-                                          dic["j"]=j
-                                          toInfer.append(dic)
-                              if xshape%12!=0:
-                                    i=xshape-12
-                                    for j in range(0,yshape-11):
-                                          #subarray=nparray[:,:,[0,2],i:xshape,j:j+12]
-                                          dic={}
-                                          #dic["data"]=(np.expand_dims(subarray.astype(np.float32),axis=0)-min_value)/(max_value-min_value)
-                                          dic["data"]=nparray
-                                          dic["i"]=i
-                                          dic["j"]=j
-                                          toInfer.append(dic)
-                                    if yshape%12!=0:
-                                          j=yshape-12
-                                          #subarray=nparray[:,:,[0,2],i:xshape,j:yshape]
-                                          dic={}
-                                          #dic["data"]=(np.expand_dims(subarray.astype(np.float32),axis=0)-min_value)/(max_value-min_value)
-                                          dic["data"]=nparray
-                                          dic["i"]=i
-                                          dic["j"]=j
-                                          toInfer.append(dic)
-                              logger_workflow.info('Starting inference', extra={'status': 'INFO'})
-                              logger_workflow.info('Number of data to infer '+str(len(toInfer)), extra={'status': 'INFO'})
-                              asyncio.run(doInference(toInfer,min_value,max_value,logger_workflow))
-                              logger_workflow.info('Inference done', extra={'status': 'INFO'})
-                              for requestElem in toInfer:
-                                    result_subarray=requestElem["result"]
-                                    i=requestElem["i"]
-                                    j=requestElem["j"]
-                                    for i2 in range(0,12):
-                                          for j2 in range(0,12):
-                                                resultArray[i+i2,j+j2]=resultArray[i+i2,j+j2]+result_subarray
-                                                count[i+i2,j+j2]=count[i+i2,j+j2]+1.0
-
-                              resultArray=resultArray/count
-
-                              transform=rasterio.transform.AffineTransformer(meta['transform'])
-
-                              outputPath=cpOutput.joinpath('classifier-result.csv')
-                              with outputPath.open('w') as outputFile:
-                                    writer = csv.writer(outputFile)
-                                    writer.writerow(['latitude','longitude','probability'])
-                                    for i in range(0,xshape):
-                                          for j in range(0,yshape):
-                                                coord=transform.xy(i,j)
-                                                writer.writerow([coord[0],coord[1],resultArray[i,j]])
-
-                              jsonData={}
-                              jsonData['data']=resultArray.tolist()
-                              jsonData['shape']=resultArray.shape
-                              jsonData['type']=str(resultArray.dtype)
-                              meta['crs']=meta['crs'].to_string()
-                              jsonData['metadata']=meta
-
-                              outputPath=cpOutput.joinpath('classifier-result.json')
-                              with outputPath.open('w') as outputFile:
-                                    json.dump(jsonData, outputFile)
-
-                              outputPath=cpOutput.joinpath('classifier-result.tiff')
-                              with outputPath.open('wb') as outputFile, rasterio.io.MemoryFile() as memfile:
-                                    logger_workflow.info('height '+str(xshape)+' width '+str(yshape), extra={'status': 'INFO'})
-                                    logger_workflow.info('type height '+str(type(xshape))+' type width '+str(type(yshape)),status='INFO')
-                                    logger_workflow.info('crs '+str(meta['crs']), extra={'status': 'INFO'})
-                                    with memfile.open(driver="GTiff",crs=meta['crs'],transform=meta['transform'],height=xshape,width=yshape,count=1,dtype=resultArray.dtype) as dst:
-                                          dst.write(resultArray,1)
-                                    outputFile.write(memfile.read())
                               
-                              logger_workflow.info('Connecting to Kafka', extra={'status': 'INFO'})
+                              cp = CloudPath("s3://"+s3_bucket_output+'/'+s3_path, client=clientS3)
+                              cpOutput = CloudPath("s3://"+s3_bucket_output+'/result-uc6-classifier/')
+                              logger_workflow.info("path is s3://"+s3_bucket_output+'/result-uc6-classifier/', extra={'status': 'DEBUG'})
+                              def fatalError(message):
+                                    logger_workflow.error(message, extra={'status': 'CRITICAL'})
 
-                              response_json ={
-                              "previous_component_end": "True",
-                              "S3_bucket_desc": {
-                                    "folder": "result-uc6-classifier","filename": ""
-                              },
-                              "meta_information": json_data_request.get('meta_information',{})}
-                              Producer.send(kafka_out,key='key',value=response_json)
-                              Producer.flush()
+                              with cpOutput.joinpath('log.txt').open('w') as fileOutput:
+                                    meta=None
+                                    def read_data(folder):
+                                          with folder.open('rb') as fileBand, rasterio.io.MemoryFile(fileBand) as memfile:
+                                                with memfile.open(driver="GTiff",sharing=False) as band_file:
+                                                      nonlocal meta
+                                                      meta=band_file.meta
+                                                      result=band_file.read()
+                                                      return result
+                                    
+                                    array=[]
+                                    listName=[]
+                                    for folder in cp.iterdir():
+                                          if folder.name.endswith('.tiff') or folder.name.endswith('.tif'):
+                                                listName.append(folder)
+                                    for folder in listName[-4:]:
+                                          array.append(read_data(folder))
+                                    nparray=np.stack(array)
+                                    shapeArray=nparray.shape
+                                    xshape=shapeArray[2]
+                                    yshape=shapeArray[3]
+                                    nparray=np.expand_dims(nparray.astype(np.float32),axis=0)
+                                    resultArray=np.zeros([xshape,yshape],dtype=np.float32)
+                                    count=np.zeros([xshape,yshape],dtype=np.float32)
+                                    if shapeArray[0]!=4:
+                                          fatalError('Invalid input shape, got '+str(shapeArray) + ' instead of (4,x,y). This is likely due to the fact that not enough tiff files are present in the folder. 4 are needed. Exiting.')
+                                          return
+                                    toInfer=[]
+                                    for i in range(0,xshape-11,2):
+                                          for j in range(0,yshape-11,2):
+                                                #subarray=nparray[:,:,[0,2],i:i+12,j:j+12]
+                                                dic={}
+                                                #dic["data"]=(np.expand_dims(subarray.astype(np.float32),axis=0)-min_value)/(max_value-min_value)
+                                                dic["data"]=nparray
+                                                dic["i"]=i
+                                                dic["j"]=j
+                                                toInfer.append(dic)
+                                          if yshape%12!=0:
+                                                j=yshape-12
+                                                #subarray=nparray[:,:,[0,2],i:i+12,j:yshape]
+                                                dic={}
+                                                #dic["data"]=(np.expand_dims(subarray.astype(np.float32),axis=0)-min_value)/(max_value-min_value)
+                                                dic["data"]=nparray
+                                                dic["i"]=i
+                                                dic["j"]=j
+                                                toInfer.append(dic)
+                                    if xshape%12!=0:
+                                          i=xshape-12
+                                          for j in range(0,yshape-11):
+                                                #subarray=nparray[:,:,[0,2],i:xshape,j:j+12]
+                                                dic={}
+                                                #dic["data"]=(np.expand_dims(subarray.astype(np.float32),axis=0)-min_value)/(max_value-min_value)
+                                                dic["data"]=nparray
+                                                dic["i"]=i
+                                                dic["j"]=j
+                                                toInfer.append(dic)
+                                          if yshape%12!=0:
+                                                j=yshape-12
+                                                #subarray=nparray[:,:,[0,2],i:xshape,j:yshape]
+                                                dic={}
+                                                #dic["data"]=(np.expand_dims(subarray.astype(np.float32),axis=0)-min_value)/(max_value-min_value)
+                                                dic["data"]=nparray
+                                                dic["i"]=i
+                                                dic["j"]=j
+                                                toInfer.append(dic)
+                                    logger_workflow.info('Starting inference', extra={'status': 'DEBUG'})
+                                    logger_workflow.info('Number of data to infer '+str(len(toInfer)), extra={'status': 'DEBUG'})
+                                    asyncio.run(doInference(toInfer,min_value,max_value,logger_workflow))
+                                    logger_workflow.info('Inference done', extra={'status': 'DEBUG'})
+                                    for requestElem in toInfer:
+                                          result_subarray=requestElem["result"]
+                                          i=requestElem["i"]
+                                          j=requestElem["j"]
+                                          for i2 in range(0,12):
+                                                for j2 in range(0,12):
+                                                      resultArray[i+i2,j+j2]=resultArray[i+i2,j+j2]+result_subarray
+                                                      count[i+i2,j+j2]=count[i+i2,j+j2]+1.0
+
+                                    resultArray=resultArray/count
+
+                                    transform=rasterio.transform.AffineTransformer(meta['transform'])
+
+                                    outputPath=cpOutput.joinpath('classifier-result.csv')
+                                    with outputPath.open('w') as outputFile:
+                                          writer = csv.writer(outputFile)
+                                          writer.writerow(['latitude','longitude','probability'])
+                                          for i in range(0,xshape):
+                                                for j in range(0,yshape):
+                                                      coord=transform.xy(i,j)
+                                                      writer.writerow([coord[0],coord[1],resultArray[i,j]])
+
+                                    jsonData={}
+                                    jsonData['data']=resultArray.tolist()
+                                    jsonData['shape']=resultArray.shape
+                                    jsonData['type']=str(resultArray.dtype)
+                                    meta['crs']=meta['crs'].to_string()
+                                    jsonData['metadata']=meta
+
+                                    outputPath=cpOutput.joinpath('classifier-result.json')
+                                    with outputPath.open('w') as outputFile:
+                                          json.dump(jsonData, outputFile)
+
+                                    outputPath=cpOutput.joinpath('classifier-result.tiff')
+                                    with outputPath.open('wb') as outputFile, rasterio.io.MemoryFile() as memfile:
+                                          logger_workflow.info('height '+str(xshape)+' width '+str(yshape), extra={'status': 'DEBUG'})
+                                          logger_workflow.info('type height '+str(type(xshape))+' type width '+str(type(yshape)),status='DEBUG')
+                                          logger_workflow.info('crs '+str(meta['crs']), extra={'status': 'DEBUG'})
+                                          with memfile.open(driver="GTiff",crs=meta['crs'],transform=meta['transform'],height=xshape,width=yshape,count=1,dtype=resultArray.dtype) as dst:
+                                                dst.write(resultArray,1)
+                                          outputFile.write(memfile.read())
+                                    
+                                    logger_workflow.info('Connecting to Kafka', extra={'status': 'DEBUG'})
+
+                                    response_json ={
+                                    "previous_component_end": "True",
+                                    "S3_bucket_desc": {
+                                          "folder": "result-uc6-classifier","filename": ""
+                                    },
+                                    "meta_information": json_data_request.get('meta_information',{})}
+                                    Producer.send(kafka_out,key='key',value=response_json)
+                                    Producer.flush()
+                        except Exception as e:
+                              logger_workflow.error('Got exception '+str(e)+'\n'+traceback.format_exc()+'\n'+'So we are ignoring the message', extra={'status': 'CRITICAL'})
+                              return
+                        logger_workflow.info('workflow finished successfully',extra={'status':'SUCCESS'})
                   thread = threading.Thread(target=threadentry)
                   thread.start()
                   response = make_response({
                               "msg": "Started the process"
                               })
-
             except Exception as e:
                   logger_workflow.error('Got exception '+str(e)+'\n'+traceback.format_exc()+'\n'+'So we are ignoring the message', extra={'status': 'CRITICAL'})
                   # HTTP answer that the message is malformed. This message will then be discarded only the fact that a sucess return code is returned is important.
                   response = make_response({
                   "msg": "There was a problem ignoring"
                   })
-            logger_workflow.info('workflow finished successfully',extra={'status':'SUCCESS'})
             return response
 
       # This function is used to do the inference on the data.
@@ -386,10 +389,10 @@ def create_app():
                   nb_Created+=1
                   if time.time()-last_shown>60:
                         last_shown=time.time()
-                        logger_workflow.info('done instance '+str(nb_done_instance)+'Inference done value '+str(nb_InferenceDone)+' postprocess done '+str(nb_Postprocess)+ ' created '+str(nb_Created), extra={'status': 'INFO'})
+                        logger_workflow.info('done instance '+str(nb_done_instance)+'Inference done value '+str(nb_InferenceDone)+' postprocess done '+str(nb_Postprocess)+ ' created '+str(nb_Created), extra={'status': 'DEBUG'})
             while nb_InferenceDone-nb_Created>0 or nb_Postprocess-nb_InferenceDone>0:
                   await asyncio.sleep(0)
             await asyncio.gather(*list_task,*list_postprocess)
-            logger_workflow.info('Inference done', extra={'status': 'INFO'})
+            logger_workflow.info('Inference done', extra={'status': 'DEBUG'})
             await triton_client.close()
       return app
