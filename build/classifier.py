@@ -247,7 +247,7 @@ def create_app():
                                     outputPath=cpOutput.joinpath('classifier-result.tiff')
                                     with outputPath.open('wb') as outputFile, rasterio.io.MemoryFile() as memfile:
                                           logger_workflow.info('height '+str(xshape)+' width '+str(yshape), extra={'status': 'DEBUG'})
-                                          logger_workflow.info('type height '+str(type(xshape))+' type width '+str(type(yshape)),status='DEBUG')
+                                          logger_workflow.info('type height '+str(type(xshape))+' type width '+str(type(yshape)),extra={'status':'DEBUG'})
                                           logger_workflow.info('crs '+str(meta['crs']), extra={'status': 'DEBUG'})
                                           with memfile.open(driver="GTiff",crs=meta['crs'],transform=meta['transform'],height=xshape,width=yshape,count=1,dtype=resultArray.dtype) as dst:
                                                 dst.write(resultArray,1)
