@@ -143,7 +143,7 @@ push_image:
           --dsttag $TAG \
           --username $CI_REPO_USERNAME \
           --password env:CI_REPO_PASSWORD \
-          --wkd $CONTEXT
+          --wkd build
       fi
 update_helm:
   extends: [.dagger]
