@@ -139,6 +139,7 @@ push_image:
           --registry $REGISTRY \
           --namespace $REPO_NAMESPACE \
           --repo $REPO \
+          --app $APP \
           --srctag $TAG \
           --dsttag $TAG \
           --username $CI_REPO_USERNAME \

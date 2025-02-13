@@ -196,6 +196,7 @@ class Uc6:
         registry: Annotated[str, Doc("Registry address")],
         namespace: Annotated[str, Doc("Registry namespace")],
         repo: Annotated[str, Doc("Registry repo")],
+        app: Annotated[str, Doc("Application name")],
         srctag: Annotated[str, Doc("Source image tag")],
         dsttag: Annotated[str, Doc("Destination image tag")],
         username: Annotated[str, Doc("Registry username")],
@@ -240,7 +241,7 @@ class Uc6:
                     "--dest-authfile",
                     "/tmp/config.json",
                     f"docker://registry.local/{repo}:{srctag}",
-                    f"docker://{registry}/{namespace}/{repo}:{dsttag}"
+                    f"docker://{registry}/{namespace}/{repo}/{app}:{dsttag}"
                 ]
             )
             .stdout()
