@@ -11,7 +11,7 @@
     APP: eo4eu-classifier
     SERVICE: eo4eu-inference-server
     HELM: helm-repo
-    REPO_BRANCH: main
+    REPO_BRANCH: backup
     HELM_BRANCH: main
     COOKIECUTTER_BRANCH: inference-server-uc
   before_script:
