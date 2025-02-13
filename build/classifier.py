@@ -286,7 +286,7 @@ def create_app():
       # The data should be a numpy array of shape (1,10,120,120) and type float32.
       # The result will be a json with the following fields:
       # model_name : The name of the model used.
-      # outputs : The result of the inference. 
+      # outputs : The result of the inference.
       async def doInference(toInfer,min_value,max_value,logger_workflow):
 
             triton_client = httpclient.InferenceServerClient(url="default-inference.uc6.svc.ecmwf-inference-server.local", verbose=False,conn_timeout=10000000000,conn_limit=None,ssl=False)
