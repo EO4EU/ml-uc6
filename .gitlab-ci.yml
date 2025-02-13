@@ -11,6 +11,7 @@
     APP: eo4eu-classifier
     SERVICE: eo4eu-inference-server
     HELM: helm-repo
+    COOKIECUTTER_BRANCH: inference-server-uc
   rules:
   - if: $CI_COMMIT_BRANCH == "main"
     variables: 
@@ -20,7 +21,6 @@
     variables:
       REPO_BRANCH: backup
       HELM_BRANCH: backup
-    COOKIECUTTER_BRANCH: inference-server-uc
   before_script:
     - "apk --no-cache add jq"
     - "export VAULT_TOKEN=$(curl -s -X PUT \
