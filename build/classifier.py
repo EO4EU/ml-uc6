@@ -52,7 +52,7 @@ def create_app():
 
       app = Flask(__name__)
 
-      logger_app.info("Application Starting up...", extra={'status': 'DEBUG'})
+      app.logger.info("Application Starting up...", extra={'status': 'DEBUG'})
 
       # This is the entry point for the SSL model from Image to Feature service.
       # It will receive a message from the Kafka topic and then do the inference on the data.
