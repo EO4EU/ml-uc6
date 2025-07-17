@@ -6,7 +6,7 @@ default_context:
   include_service: "yes"
   service_name: "classifier"
   service_image_repo: "registry.apps.eo4eu.eu/eo4eu/eo4eu-inference-server/uc6/eo4eu-classifier"
-  service_image_tag: "1d14842f4fa2eb9cce81ea13b3539cc45e9eaeef"
+  service_image_tag: "a16e28a8d6ef10d1938cddc08543ec2a4b950c14"
   service_image_pull_policy: "Always"
   service_image_secret: "uc6-registry"
   service_container_port: "8080"
