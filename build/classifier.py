@@ -267,17 +267,13 @@ def create_app():
 
             async def consume(task):
                   try:
-                        if task[0]>1:
+                        if task[0]>0:
                               count=task[1]
                               inputs = []
                               outputs = []
-                              iCord=toInfer[count]["i"]
-                              jCord=toInfer[count]["j"]
                               data=toInfer[count]["data"]
-                              input=np.zeros([task[1],data.shape[0],data.shape[1]],dtype=np.float32)
-                              for i in range(0,task[1]):
-                                    iCord=toInfer[count+i]["i"]
-                                    jCord=toInfer[count+i]["j"]
+                              input=np.zeros([task[0],data.shape[0],data.shape[1]],dtype=np.float32)
+                              for i in range(0,task[0]):
                                     data=toInfer[count]["data"]
                                     input[i]=data
                               inputs.append(httpclient.InferInput('input',input.shape, "FP32"))
@@ -287,20 +283,6 @@ def create_app():
                               results = await triton_client.infer('maxent',inputs,outputs=outputs)
                               gc.collect()
                               return (task,results)
-                        elif task[0]==1:
-                              count=task[1]
-                              inputs=[]
-                              outputs=[]
-                              iCord=toInfer[count]["i"]
-                              jCord=toInfer[count]["j"]
-                              data=toInfer[count]["data"]
-                              inputs.append(httpclient.InferInput('input',data.shape, "FP32"))
-                              inputs[0].set_data_from_numpy(data, binary_data=True)
-                              del data
-                              outputs.append(httpclient.InferRequestedOutput('output', binary_data=True))
-                              results = await triton_client.infer('maxent',inputs,outputs=outputs)
-                              return (task,results)
-                                    #toInfer[count]["result"]=results.as_numpy('probability')[0][0]
                   except Exception as e:
                         logger_workflow.debug('Got exception in inference '+str(e)+'\n'+traceback.format_exc(), extra={'status': 'WARNING'})
                         nonlocal last_throw
@@ -308,13 +290,10 @@ def create_app():
                         return await consume(task)
                   
             async def postprocess(task,results):
-                  if task[0]==1:
-                        result=results.as_numpy('output')[0][0]
-                        toInfer[task[1]]["result"]=result
-                  if task[0]==1000:
-                        result=results.as_numpy('output')
-                        for i in range(0,1000):
-                              toInfer[task[1]+i]["result"]=result[i][0]
+                  nb=task[0]
+                  result=results.as_numpy('output')
+                  for i in range(0,nb):
+                        toInfer[task[1]+i]["result"]=result[i][0]
 
             def postprocessTask(task):
                   list_task.discard(task)
