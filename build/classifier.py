@@ -141,19 +141,8 @@ def create_app():
                               cp = CloudPath("s3://"+s3_bucket_output+'/'+s3_path, client=clientS3)
                               cpOutput = CloudPath("s3://"+s3_bucket_output+'/result-uc6-classifier/')
                               logger_workflow.debug("path is s3://"+s3_bucket_output+'/result-uc6-classifier/', extra={'status': 'DEBUG'})
-                              def fatalError(message):
-                                    logger_workflow.error(message, extra={'status': 'CRITICAL'})
 
                               with cpOutput.joinpath('log.txt').open('w') as fileOutput:
-                                    meta=None
-                                    def read_data(folder):
-                                          with folder.open('rb') as fileBand, rasterio.io.MemoryFile(fileBand) as memfile:
-                                                with memfile.open(driver="GTiff",sharing=False) as band_file:
-                                                      nonlocal meta
-                                                      meta=band_file.meta
-                                                      result=band_file.read()
-                                                      return result
-                                    
                                     listData=[]
                                     for folder in cp.rglob('*.pkl'):
                                           data=pickle.load(folder.open('rb'))
@@ -170,9 +159,10 @@ def create_app():
                                                                                     listData.append({'path': folder, 'data': data})
                                     for data in listData:
                                           toInfer=[]
-                                          input=data['input_sequence']
-                                          nodata_mask=data['nodata_mask']
-                                          full_transform=data['full_transform']
+                                          data_data=data['data']
+                                          input=data_data['input_sequence']
+                                          nodata_mask=data_data['nodata_mask']
+                                          full_transform=data_data['full_transform']
                                           xshape=input.shape[2]
                                           yshape=input.shape[3]
                                           for i in range(0,xshape):
