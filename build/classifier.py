@@ -273,12 +273,12 @@ def create_app():
                               outputs = []
                               iCord=toInfer[count]["i"]
                               jCord=toInfer[count]["j"]
-                              data=toInfer[count]["data"][:,:,iCord,jCord]
+                              data=toInfer[count]["data"]
                               input=np.zeros([task[1],data.shape[0],data.shape[1]],dtype=np.float32)
                               for i in range(0,task[1]):
                                     iCord=toInfer[count+i]["i"]
                                     jCord=toInfer[count+i]["j"]
-                                    data=toInfer[count]["data"][:,:,iCord,jCord]
+                                    data=toInfer[count]["data"]
                                     input[i]=data
                               inputs.append(httpclient.InferInput('input',input.shape, "FP32"))
                               del data
@@ -293,7 +293,7 @@ def create_app():
                               outputs=[]
                               iCord=toInfer[count]["i"]
                               jCord=toInfer[count]["j"]
-                              data=toInfer[count]["data"][:,:,iCord,jCord:jCord]
+                              data=toInfer[count]["data"]
                               inputs.append(httpclient.InferInput('input',data.shape, "FP32"))
                               inputs[0].set_data_from_numpy(data, binary_data=True)
                               del data
