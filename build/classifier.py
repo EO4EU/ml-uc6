@@ -125,9 +125,7 @@ def create_app():
                               s3_region_endpoint = json_data_configmap['S3_bucket']['endpoint_url']
                               s3_path = json_data_request['S3_bucket_desc']['folder']
                               s3_file = json_data_request['S3_bucket_desc'].get('filename',None)
-                              min_value= np.array([4.63616730e+02,-3.27219640e-11]).reshape(1,1,-1,1,1).astype(np.float32)
-                              max_value= np.array([5.43290894e+02, 1.05710514e-01]).reshape(1,1,-1,1,1).astype(np.float32)
-
+                  
                               #min_value= np.array([-3.27219640e-11,4.63616730e+02]).reshape(1,1,-1,1,1).astype(np.float32)
                               #max_value= np.array([1.05710514e-01,5.43290894e+02]).reshape(1,1,-1,1,1).astype(np.float32)
                               
@@ -156,106 +154,80 @@ def create_app():
                                                       result=band_file.read()
                                                       return result
                                     
-                                    array=[]
-                                    listName=[]
-                                    for folder in cp.iterdir():
-                                          if folder.name.endswith('.tiff') or folder.name.endswith('.tif'):
-                                                listName.append(folder)
-                                    for folder in listName[-4:]:
-                                          array.append(read_data(folder))
-                                    nparray=np.stack(array)
-                                    shapeArray=nparray.shape
-                                    xshape=shapeArray[2]
-                                    yshape=shapeArray[3]
-                                    nparray=np.expand_dims(nparray.astype(np.float32),axis=0)
-                                    resultArray=np.zeros([xshape,yshape],dtype=np.float32)
-                                    count=np.zeros([xshape,yshape],dtype=np.float32)
-                                    if shapeArray[0]!=4:
-                                          fatalError('Invalid input shape, got '+str(shapeArray) + ' instead of (4,x,y). This is likely due to the fact that not enough tiff files are present in the folder. 4 are needed. Exiting.')
-                                          return
-                                    toInfer=[]
-                                    for i in range(0,xshape-11,2):
-                                          for j in range(0,yshape-11,2):
-                                                #subarray=nparray[:,:,[0,2],i:i+12,j:j+12]
-                                                dic={}
-                                                #dic["data"]=(np.expand_dims(subarray.astype(np.float32),axis=0)-min_value)/(max_value-min_value)
-                                                dic["data"]=nparray
-                                                dic["i"]=i
-                                                dic["j"]=j
-                                                toInfer.append(dic)
-                                          if yshape%12!=0:
-                                                j=yshape-12
-                                                #subarray=nparray[:,:,[0,2],i:i+12,j:yshape]
-                                                dic={}
-                                                #dic["data"]=(np.expand_dims(subarray.astype(np.float32),axis=0)-min_value)/(max_value-min_value)
-                                                dic["data"]=nparray
-                                                dic["i"]=i
-                                                dic["j"]=j
-                                                toInfer.append(dic)
-                                    if xshape%12!=0:
-                                          i=xshape-12
-                                          for j in range(0,yshape-11):
-                                                #subarray=nparray[:,:,[0,2],i:xshape,j:j+12]
-                                                dic={}
-                                                #dic["data"]=(np.expand_dims(subarray.astype(np.float32),axis=0)-min_value)/(max_value-min_value)
-                                                dic["data"]=nparray
-                                                dic["i"]=i
-                                                dic["j"]=j
-                                                toInfer.append(dic)
-                                          if yshape%12!=0:
-                                                j=yshape-12
-                                                #subarray=nparray[:,:,[0,2],i:xshape,j:yshape]
-                                                dic={}
-                                                #dic["data"]=(np.expand_dims(subarray.astype(np.float32),axis=0)-min_value)/(max_value-min_value)
-                                                dic["data"]=nparray
-                                                dic["i"]=i
-                                                dic["j"]=j
-                                                toInfer.append(dic)
-                                    logger_workflow.debug('Starting inference', extra={'status': 'DEBUG'})
-                                    logger_workflow.debug('Number of data to infer '+str(len(toInfer)), extra={'status': 'DEBUG'})
-                                    asyncio.run(doInference(toInfer,min_value,max_value,logger_workflow))
-                                    logger_workflow.debug('Inference done', extra={'status': 'DEBUG'})
-                                    for requestElem in toInfer:
-                                          result_subarray=requestElem["result"]
-                                          i=requestElem["i"]
-                                          j=requestElem["j"]
-                                          for i2 in range(0,12):
-                                                for j2 in range(0,12):
-                                                      resultArray[i+i2,j+j2]=resultArray[i+i2,j+j2]+result_subarray
-                                                      count[i+i2,j+j2]=count[i+i2,j+j2]+1.0
-
-                                    resultArray=resultArray/count
-
-                                    transform=rasterio.transform.AffineTransformer(meta['transform'])
-
-                                    outputPath=cpOutput.joinpath('classifier-result.csv')
-                                    with outputPath.open('w') as outputFile:
-                                          writer = csv.writer(outputFile)
-                                          writer.writerow(['latitude','longitude','probability'])
+                                    listData=[]
+                                    for folder in cp.rglob('*.pkl'):
+                                          data=pickle.load(folder.open('rb'))
+                                          if isinstance(data, dict) and 'input_sequence' in data and 'nodata_mask' in data and 'full_transform' in data:
+                                                input_sequence = data['input_sequence']
+                                                if isinstance(input_sequence, np.ndarray):
+                                                      if input_sequence.ndim == 4:
+                                                            if input_sequence.shape[0] == 10 and input_sequence.shape[1] == 4:
+                                                                  nodata_mask = data['nodata_mask']
+                                                                  if isinstance(nodata_mask, np.ndarray):
+                                                                        if nodata_mask.ndim == 2 and nodata_mask.shape == input_sequence.shape[2:]:
+                                                                              full_transform = data['full_transform']
+                                                                              if isinstance(full_transform, rasterio.transform.Affine):
+                                                                                    listData.append({'path': folder, 'data': data})
+                                    for data in listData:
+                                          toInfer=[]
+                                          input=data['input_sequence']
+                                          nodata_mask=data['nodata_mask']
+                                          full_transform=data['full_transform']
+                                          xshape=input.shape[2]
+                                          yshape=input.shape[3]
                                           for i in range(0,xshape):
                                                 for j in range(0,yshape):
-                                                      coord=transform.xy(i,j)
-                                                      writer.writerow([coord[0],coord[1],resultArray[i,j]])
+                                                      if nodata_mask[i,j]:
+                                                            dic={}
+                                                            dic['data']=input[:,:,i,j]
+                                                            dic['i']=i
+                                                            dic['j']=j
+                                                            toInfer.append(dic)
+                                          logger_workflow.debug('Starting inference', extra={'status': 'DEBUG'})
+                                          logger_workflow.debug('Number of data to infer '+str(len(toInfer)), extra={'status': 'DEBUG'})
+                                          asyncio.run(doInference(toInfer,logger_workflow))
+                                          logger_workflow.debug('Inference done', extra={'status': 'DEBUG'})
+                                          # for requestElem in toInfer:
+                                          #       result_subarray=requestElem["result"]
+                                          #       i=requestElem["i"]
+                                          #       j=requestElem["j"]
+                                          #       for i2 in range(0,12):
+                                          #             for j2 in range(0,12):
+                                          #                   resultArray[i+i2,j+j2]=resultArray[i+i2,j+j2]+result_subarray
+                                          #                   count[i+i2,j+j2]=count[i+i2,j+j2]+1.0
 
-                                    jsonData={}
-                                    jsonData['data']=resultArray.tolist()
-                                    jsonData['shape']=resultArray.shape
-                                    jsonData['type']=str(resultArray.dtype)
-                                    meta['crs']=meta['crs'].to_string()
-                                    jsonData['metadata']=meta
+                                          # resultArray=resultArray/count
 
-                                    outputPath=cpOutput.joinpath('classifier-result.json')
-                                    with outputPath.open('w') as outputFile:
-                                          json.dump(jsonData, outputFile)
+                                          # transform=rasterio.transform.AffineTransformer(meta['transform'])
 
-                                    outputPath=cpOutput.joinpath('classifier-result.tiff')
-                                    with outputPath.open('wb') as outputFile, rasterio.io.MemoryFile() as memfile:
-                                          logger_workflow.debug('height '+str(xshape)+' width '+str(yshape), extra={'status': 'DEBUG'})
-                                          logger_workflow.debug('type height '+str(type(xshape))+' type width '+str(type(yshape)),extra={'status':'DEBUG'})
-                                          logger_workflow.debug('crs '+str(meta['crs']), extra={'status': 'DEBUG'})
-                                          with memfile.open(driver="GTiff",crs=meta['crs'],transform=meta['transform'],height=xshape,width=yshape,count=1,dtype=resultArray.dtype) as dst:
-                                                dst.write(resultArray,1)
-                                          outputFile.write(memfile.read())
+                                          # outputPath=cpOutput.joinpath('classifier-result.csv')
+                                          # with outputPath.open('w') as outputFile:
+                                          #       writer = csv.writer(outputFile)
+                                          #       writer.writerow(['latitude','longitude','probability'])
+                                          #       for i in range(0,xshape):
+                                          #             for j in range(0,yshape):
+                                          #                   coord=transform.xy(i,j)
+                                          #                   writer.writerow([coord[0],coord[1],resultArray[i,j]])
+
+                                          # jsonData={}
+                                          # jsonData['data']=resultArray.tolist()
+                                          # jsonData['shape']=resultArray.shape
+                                          # jsonData['type']=str(resultArray.dtype)
+                                          # meta['crs']=meta['crs'].to_string()
+                                          # jsonData['metadata']=meta
+
+                                          # outputPath=cpOutput.joinpath('classifier-result.json')
+                                          # with outputPath.open('w') as outputFile:
+                                          #       json.dump(jsonData, outputFile)
+
+                                          # outputPath=cpOutput.joinpath('classifier-result.tiff')
+                                          # with outputPath.open('wb') as outputFile, rasterio.io.MemoryFile() as memfile:
+                                          #       logger_workflow.debug('height '+str(xshape)+' width '+str(yshape), extra={'status': 'DEBUG'})
+                                          #       logger_workflow.debug('type height '+str(type(xshape))+' type width '+str(type(yshape)),extra={'status':'DEBUG'})
+                                          #       logger_workflow.debug('crs '+str(meta['crs']), extra={'status': 'DEBUG'})
+                                          #       with memfile.open(driver="GTiff",crs=meta['crs'],transform=meta['transform'],height=xshape,width=yshape,count=1,dtype=resultArray.dtype) as dst:
+                                          #             dst.write(resultArray,1)
+                                          #       outputFile.write(memfile.read())
                                     
                                     logger_workflow.debug('Connecting to Kafka', extra={'status': 'DEBUG'})
 
@@ -291,7 +263,7 @@ def create_app():
       # The result will be a json with the following fields:
       # model_name : The name of the model used.
       # outputs : The result of the inference.
-      async def doInference(toInfer,min_value,max_value,logger_workflow):
+      async def doInference(toInfer,logger_workflow):
 
             triton_client = httpclient.InferenceServerClient(url="default-inference.uc6.svc.cineca-inference-server.local", verbose=False,conn_timeout=10000000000,conn_limit=None,ssl=False)
             nb_Created=0
@@ -305,42 +277,38 @@ def create_app():
 
             async def consume(task):
                   try:
-                        if task[0]==1000:
+                        if task[0]>1:
                               count=task[1]
                               inputs = []
                               outputs = []
                               iCord=toInfer[count]["i"]
                               jCord=toInfer[count]["j"]
-                              data=toInfer[count]["data"][:,:,[0,2],iCord:iCord+12,jCord:jCord+12]
-                              input=np.zeros([1000,data.shape[1],data.shape[2],data.shape[3],data.shape[4]],dtype=np.float32)
-                              #log_function('input shape '+str(input.shape))
-                              for i in range(0,1000):
+                              data=toInfer[count]["data"][:,:,iCord,jCord]
+                              input=np.zeros([task[1],data.shape[0],data.shape[1]],dtype=np.float32)
+                              for i in range(0,task[1]):
                                     iCord=toInfer[count+i]["i"]
                                     jCord=toInfer[count+i]["j"]
-                                    data=(toInfer[count+i]["data"][:,:,[0,2],iCord:iCord+12,jCord:jCord+12]-min_value)/(max_value-min_value)
-                                    input[i]=data[0]
+                                    data=toInfer[count]["data"][:,:,iCord,jCord]
+                                    input[i]=data
                               inputs.append(httpclient.InferInput('input',input.shape, "FP32"))
                               del data
                               inputs[0].set_data_from_numpy(input, binary_data=True)
-                              outputs.append(httpclient.InferRequestedOutput('probability', binary_data=True))
-                              results = await triton_client.infer('classifierdaily1000',inputs,outputs=outputs)
+                              outputs.append(httpclient.InferRequestedOutput('output', binary_data=True))
+                              results = await triton_client.infer('maxent',inputs,outputs=outputs)
                               gc.collect()
                               return (task,results)
-                                    #results=results.as_numpy('probability')
-                                    #for i in range(0,1000):
-                                          #toInfer[count+i]["result"]=results[i][0]
                         elif task[0]==1:
                               count=task[1]
                               inputs=[]
                               outputs=[]
                               iCord=toInfer[count]["i"]
                               jCord=toInfer[count]["j"]
-                              data=(toInfer[count]["data"][:,:,[0,2],iCord:iCord+12,jCord:jCord+12]-min_value)/(max_value-min_value)
+                              data=toInfer[count]["data"][:,:,iCord,jCord:jCord]
                               inputs.append(httpclient.InferInput('input',data.shape, "FP32"))
                               inputs[0].set_data_from_numpy(data, binary_data=True)
                               del data
-                              outputs.append(httpclient.InferRequestedOutput('probability', binary_data=True))
-                              results = await triton_client.infer('classifierdaily1',inputs,outputs=outputs)
+                              outputs.append(httpclient.InferRequestedOutput('output', binary_data=True))
+                              results = await triton_client.infer('maxent',inputs,outputs=outputs)
                               return (task,results)
                                     #toInfer[count]["result"]=results.as_numpy('probability')[0][0]
                   except Exception as e:
@@ -351,10 +319,10 @@ def create_app():
                   
             async def postprocess(task,results):
                   if task[0]==1:
-                        result=results.as_numpy('probability')[0][0]
+                        result=results.as_numpy('output')[0][0]
                         toInfer[task[1]]["result"]=result
                   if task[0]==1000:
-                        result=results.as_numpy('probability')
+                        result=results.as_numpy('output')
                         for i in range(0,1000):
                               toInfer[task[1]+i]["result"]=result[i][0]
 
@@ -375,9 +343,9 @@ def create_app():
             def producer():
                   total=len(toInfer)
                   count=0
-                  while total-count>=1000:
-                        yield (1000,count)
-                        count=count+1000
+                  while total-count>=255:
+                        yield (255,count)
+                        count=count+255
                   while total-count>=1:
                         yield (1,count)
                         count=count+1
