@@ -289,9 +289,9 @@ def create_app():
             def producer():
                   total=len(toInfer)
                   count=0
-                  while total-count>=10:
-                        yield (10,count)
-                        count=count+10
+                  while total-count>=255:
+                        yield (255,count)
+                        count=count+255
                   while total-count>=1:
                         yield (1,count)
                         count=count+1
