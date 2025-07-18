@@ -251,7 +251,7 @@ def create_app():
                               data=toInfer[count]["data"]
                               input=np.zeros([task[0],data.shape[0],data.shape[1]],dtype=np.float32)
                               for i in range(0,task[0]):
-                                    data=toInfer[count]["data"]
+                                    data=toInfer[count+i]["data"]
                                     input[i]=data
                               inputs.append(httpclient.InferInput('input',input.shape, "FP32"))
                               del data
@@ -269,7 +269,6 @@ def create_app():
             async def postprocess(task,results):
                   nb=task[0]
                   result=results.as_numpy('output')
-                  logger_workflow.debug('Postprocess task '+str(result), extra={'status': 'DEBUG'})
                   for i in range(0,nb):
                         toInfer[task[1]+i]["result"]=result[i][0]
 
