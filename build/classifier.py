@@ -269,6 +269,7 @@ def create_app():
             async def postprocess(task,results):
                   nb=task[0]
                   result=results.as_numpy('output')
+                  logger_workflow.debug('Postprocess task '+str(result), extra={'status': 'DEBUG'})
                   for i in range(0,nb):
                         toInfer[task[1]+i]["result"]=result[i][0]
 
@@ -289,9 +290,9 @@ def create_app():
             def producer():
                   total=len(toInfer)
                   count=0
-                  while total-count>=255:
-                        yield (255,count)
-                        count=count+255
+                  while total-count>=10:
+                        yield (10,count)
+                        count=count+10
                   while total-count>=1:
                         yield (1,count)
                         count=count+1
