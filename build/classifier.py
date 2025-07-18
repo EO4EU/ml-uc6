@@ -165,6 +165,7 @@ def create_app():
                                           full_transform=data_data['full_transform']
                                           xshape=input.shape[2]
                                           yshape=input.shape[3]
+                                          path=data['path']
                                           for i in range(0,xshape):
                                                 for j in range(0,yshape):
                                                       if nodata_mask[i,j]:
@@ -177,47 +178,23 @@ def create_app():
                                           logger_workflow.debug('Number of data to infer '+str(len(toInfer)), extra={'status': 'DEBUG'})
                                           asyncio.run(doInference(toInfer,logger_workflow))
                                           logger_workflow.debug('Inference done', extra={'status': 'DEBUG'})
-                                          # for requestElem in toInfer:
-                                          #       result_subarray=requestElem["result"]
-                                          #       i=requestElem["i"]
-                                          #       j=requestElem["j"]
-                                          #       for i2 in range(0,12):
-                                          #             for j2 in range(0,12):
-                                          #                   resultArray[i+i2,j+j2]=resultArray[i+i2,j+j2]+result_subarray
-                                          #                   count[i+i2,j+j2]=count[i+i2,j+j2]+1.0
-
-                                          # resultArray=resultArray/count
-
-                                          # transform=rasterio.transform.AffineTransformer(meta['transform'])
-
-                                          # outputPath=cpOutput.joinpath('classifier-result.csv')
-                                          # with outputPath.open('w') as outputFile:
-                                          #       writer = csv.writer(outputFile)
-                                          #       writer.writerow(['latitude','longitude','probability'])
-                                          #       for i in range(0,xshape):
-                                          #             for j in range(0,yshape):
-                                          #                   coord=transform.xy(i,j)
-                                          #                   writer.writerow([coord[0],coord[1],resultArray[i,j]])
-
-                                          # jsonData={}
-                                          # jsonData['data']=resultArray.tolist()
-                                          # jsonData['shape']=resultArray.shape
-                                          # jsonData['type']=str(resultArray.dtype)
-                                          # meta['crs']=meta['crs'].to_string()
-                                          # jsonData['metadata']=meta
-
-                                          # outputPath=cpOutput.joinpath('classifier-result.json')
-                                          # with outputPath.open('w') as outputFile:
-                                          #       json.dump(jsonData, outputFile)
-
-                                          # outputPath=cpOutput.joinpath('classifier-result.tiff')
-                                          # with outputPath.open('wb') as outputFile, rasterio.io.MemoryFile() as memfile:
-                                          #       logger_workflow.debug('height '+str(xshape)+' width '+str(yshape), extra={'status': 'DEBUG'})
-                                          #       logger_workflow.debug('type height '+str(type(xshape))+' type width '+str(type(yshape)),extra={'status':'DEBUG'})
-                                          #       logger_workflow.debug('crs '+str(meta['crs']), extra={'status': 'DEBUG'})
-                                          #       with memfile.open(driver="GTiff",crs=meta['crs'],transform=meta['transform'],height=xshape,width=yshape,count=1,dtype=resultArray.dtype) as dst:
-                                          #             dst.write(resultArray,1)
-                                          #       outputFile.write(memfile.read())
+                                          output=np.zeros((xshape,yshape),dtype=np.float32)
+                                          output.fill(-1.0)
+                                          for element in toInfer:
+                                                i=element['i']
+                                                j=element['j']
+                                                result=element['result']
+                                                output[i,j]=result
+                                          rel_path=path.relative_to(cp)
+                                          output_path = cpOutput.joinpath(rel_path+'_result.tiff')
+                                          output_path.parent.mkdir(parents=True, exist_ok=True)
+                                          with output_path.open('wb') as outputFile, rasterio.io.MemoryFile() as memfile:
+                                                logger_workflow.debug('height '+str(xshape)+' width '+str(yshape), extra={'status': 'DEBUG'})
+                                                logger_workflow.debug('type height '+str(type(xshape))+' type width '+str(type(yshape)),extra={'status':'DEBUG'})
+                                                with memfile.open(driver="GTiff", crs="+proj=latlong", transform=full_transform, height=xshape, width=yshape, count=1, dtype=output.dtype,nodata=-1) as dst:
+                                                      dst.update_tags(1, description=f"Locust suitability index")
+                                                      dst.write(output, 1)
+                                                outputFile.write(memfile.read())
                                     
                                     logger_workflow.debug('Connecting to Kafka', extra={'status': 'DEBUG'})
 
