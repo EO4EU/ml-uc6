@@ -168,7 +168,7 @@ def create_app():
                                           path=data['path']
                                           for i in range(0,xshape):
                                                 for j in range(0,yshape):
-                                                      if nodata_mask[i,j]:
+                                                      if not(nodata_mask[i,j]):
                                                             dic={}
                                                             dic['data']=input[:,:,i,j]
                                                             dic['i']=i
