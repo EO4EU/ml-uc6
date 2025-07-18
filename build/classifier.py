@@ -186,7 +186,7 @@ def create_app():
                                                 result=element['result']
                                                 output[i,j]=result
                                           rel_path=path.relative_to(cp)
-                                          output_path = cpOutput.joinpath(rel_path+'_result.tiff')
+                                          output_path = cpOutput.joinpath(str(rel_path)+'_result.tiff')
                                           output_path.parent.mkdir(parents=True, exist_ok=True)
                                           with output_path.open('wb') as outputFile, rasterio.io.MemoryFile() as memfile:
                                                 logger_workflow.debug('height '+str(xshape)+' width '+str(yshape), extra={'status': 'DEBUG'})
