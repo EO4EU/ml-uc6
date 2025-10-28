@@ -157,7 +157,10 @@ def create_app():
                                                                               full_transform = data['full_transform']
                                                                               if isinstance(full_transform, rasterio.transform.Affine):
                                                                                     listData.append({'path': folder, 'data': data})
-                                    for data in listData:
+                                    file_timings=[]
+                                    total_number=len(listData)
+                                    for file_number,data in enumerate(listData):
+                                          file_start_time=time.time()
                                           toInfer=[]
                                           data_data=data['data']
                                           input=data_data['input_sequence']
@@ -176,7 +179,7 @@ def create_app():
                                                             toInfer.append(dic)
                                           logger_workflow.debug('Starting inference', extra={'status': 'DEBUG'})
                                           logger_workflow.debug('Number of data to infer '+str(len(toInfer)), extra={'status': 'DEBUG'})
-                                          asyncio.run(doInference(toInfer,logger_workflow))
+                                          asyncio.run(doInference(toInfer,logger_workflow,file_timings,file_number,total_number))
                                           logger_workflow.debug('Inference done', extra={'status': 'DEBUG'})
                                           output=np.zeros((xshape,yshape),dtype=np.float32)
                                           output.fill(-1.0)
@@ -195,6 +198,9 @@ def create_app():
                                                       dst.update_tags(1, description=f"Locust suitability index")
                                                       dst.write(output, 1)
                                                 outputFile.write(memfile.read())
+                                          file_end_time=time.time()
+                                          file_timings.append(file_end_time-file_start_time)
+
                                     
                                     logger_workflow.debug('Connecting to Kafka', extra={'status': 'DEBUG'})
 
@@ -230,7 +236,7 @@ def create_app():
       # The result will be a json with the following fields:
       # model_name : The name of the model used.
       # outputs : The result of the inference.
-      async def doInference(toInfer,logger_workflow):
+      async def doInference(toInfer,logger_workflow,file_timings,file_number,total_number):
 
             triton_client = httpclient.InferenceServerClient(url="default-inference.uc6.svc.cineca-inference-server.local", verbose=False,conn_timeout=10000000000,conn_limit=None,ssl=False)
             nb_Created=0
@@ -241,6 +247,8 @@ def create_app():
             list_task=set()
             last_throw=0
             lookup={}
+            nb_line_done=0
+            nb_line_total=len(toInfer)
 
             async def consume(task):
                   try:
@@ -269,8 +277,10 @@ def create_app():
             async def postprocess(task,results):
                   nb=task[0]
                   result=results.as_numpy('output')
+                  nonlocal nb_line_done
                   for i in range(0,nb):
                         toInfer[task[1]+i]["result"]=result[i][0]
+                  nb_line_done+=nb
 
             def postprocessTask(task):
                   list_task.discard(task)
@@ -308,6 +318,38 @@ def create_app():
                   if time.time()-last_shown>60:
                         last_shown=time.time()
                         logger_workflow.debug('done instance '+str(nb_done_instance)+'Inference done value '+str(nb_InferenceDone)+' postprocess done '+str(nb_Postprocess)+ ' created '+str(nb_Created), extra={'status': 'DEBUG'})
+                        elapsed_time = time.time() - start + 60  # Add back the 60s offset
+                        if nb_line_done > 0:
+                              rate = nb_line_done / elapsed_time
+                              remaining_lines_current_file = nb_line_total - nb_line_done
+                              estimated_remaining_seconds_current_file = remaining_lines_current_file / rate if rate > 0 else 0
+                              # Estimate time for remaining files using actual timing data from completed files
+                              if len(file_timings) > 0:
+                                    # Use average of completed files for better accuracy
+                                    avg_time_per_file = sum(file_timings) / len(file_timings)
+                              else:
+                                    # Fallback to current file estimate if no completed files yet
+                                    avg_time_per_file = elapsed_time
+                              remaining_files = total_number - file_number - 1
+                              estimated_remaining_seconds_other_files = remaining_files * avg_time_per_file
+                              total_estimated_remaining = estimated_remaining_seconds_current_file + estimated_remaining_seconds_other_files
+                              hours = int(total_estimated_remaining // 3600)
+                              minutes = int((total_estimated_remaining % 3600) // 60)
+                              seconds = int(total_estimated_remaining % 60)
+                              time_estimate = f"{hours}h {minutes}m {seconds}s" if hours > 0 else f"{minutes}m {seconds}s"
+                        elif nb_line_done == 0 and len(file_timings) > 0:
+                              # If no lines done yet, use average of completed files
+                              avg_time_per_file = sum(file_timings) / len(file_timings)
+                              remaining_files = total_number - file_number
+                              estimated_remaining_seconds_other_files = remaining_files * avg_time_per_file
+                              hours = int(estimated_remaining_seconds_other_files // 3600)
+                              minutes = int((estimated_remaining_seconds_other_files % 3600) // 60)
+                              seconds = int(estimated_remaining_seconds_other_files % 60)
+                              time_estimate = f"{hours}h {minutes}m {seconds}s" if hours > 0 else f"{minutes}m {seconds}s"
+                        else:
+                              time_estimate = "calculating..."
+                        logger_workflow.info('Progress file '+str(file_number)+'/'+str(total_number)+' : '+str(nb_line_done)+'/' +str(nb_line_total)+' patches ('+str((nb_line_done*100)//nb_line_total)+' %) - Est. remaining: '+time_estimate, extra={'status': 'INFO', 'overwrite':True})
+
             while nb_InferenceDone-nb_Created>0 or nb_Postprocess-nb_InferenceDone>0:
                   await asyncio.sleep(0)
             await asyncio.gather(*list_task,*list_postprocess)

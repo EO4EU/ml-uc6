@@ -40,6 +40,8 @@ class KafkaHandler(logging.Handler):
         optional["namespace"]=get_current_namespace()
         optional["pod"]=get_current_pod_name()
         message["optional"]=optional
+        if hasattr(record,'overwrite') and record.overwrite:
+            optional['overwrite']=True
         if hasattr(record, 'producer'):
             producer=record.producer
             producer.send("monitoring.notify",key='key',value=message)
