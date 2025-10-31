@@ -157,6 +157,7 @@ def create_app():
                                                                               full_transform = data['full_transform']
                                                                               if isinstance(full_transform, rasterio.transform.Affine):
                                                                                     listData.append({'path': folder, 'data': data})
+                                    logger_workflow.info('Calculating time estimate', extra={'status': 'INFO'})
                                     file_timings=[]
                                     total_number=len(listData)
                                     for file_number,data in enumerate(listData):
@@ -196,6 +197,15 @@ def create_app():
                                                 logger_workflow.debug('type height '+str(type(xshape))+' type width '+str(type(yshape)),extra={'status':'DEBUG'})
                                                 with memfile.open(driver="GTiff", crs="+proj=latlong", transform=full_transform, height=xshape, width=yshape, count=1, dtype=output.dtype,nodata=-1) as dst:
                                                       dst.update_tags(1, description=f"Locust suitability index")
+                                                      dst.set_band_description(1, 'Locust suitability index')
+                                                      dst.set_band_unit(1,'Unitless')
+                                                      dst.update_tags(bidx=1,
+                                                            long_name="Locust Suitability Index",
+                                                            description="Locust Suitability Index",
+                                                            min=0.0,
+                                                            max=1.0
+                                                            )
+                                                      dst.update_tags(title="Locust Suitability Index")
                                                       dst.write(output, 1)
                                                 outputFile.write(memfile.read())
                                           file_end_time=time.time()
