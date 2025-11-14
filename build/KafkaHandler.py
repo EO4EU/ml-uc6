@@ -7,7 +7,7 @@ def get_current_namespace():
         with open("/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r") as f:
             return f.read().strip()
     except FileNotFoundError:
-        # Handle the case where the file doesn't exist 
+        # Handle the case where the file doesn't exist
         return ''
     
 def get_current_pod_name():
@@ -24,15 +24,16 @@ class DefaultContextFilter(logging.Filter):
         return True
 
 class KafkaHandler(logging.Handler):
-    def __init__(self, level=logging.NOTSET):
+    def __init__(self, level=logging.NOTSET,defaultproducer=None):
         super().__init__(level)
+        self.producer=defaultproducer
 
     def emit(self, record):
         message={}
         message["component_name"]=record.source
         message["workflow_name"]=record.workflow_name
         message["status"]=record.status
-        message["description"]=record.msg[:80]
+        message["description"]=record.msg
         timestamp = record.created
         dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
         message["timestamp"]=dt.isoformat()
@@ -40,10 +41,9 @@ class KafkaHandler(logging.Handler):
         optional["namespace"]=get_current_namespace()
         optional["pod"]=get_current_pod_name()
         message["optional"]=optional
-        if hasattr(record,'overwrite') and record.overwrite:
-            message['overwrite']=True
         if hasattr(record, 'producer'):
             producer=record.producer
-            producer.send("monitoring.notify",key='key',value=message)
-            producer.flush()
-            
+        else:
+            producer=self.producer
+        producer.send("monitoring.notify",key='key',value=message)
+        producer.flush()
