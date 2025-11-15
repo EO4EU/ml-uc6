@@ -198,11 +198,11 @@ def write_html(path: str, summary: Dict[str, Any]):
         for k in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO', 'UNKNOWN']:
             c = counts.get(k, 0)
             if c > 0:
-                f.write('<tr><td style="padding:8px">{} VULNERABILITIES</td><td style="padding:8px">{}</td></tr>'.format(html.escape(str(k)), c))
+                f.write('<tr><td style="padding:8px">VULNERABILITIES - {}</td><td style="padding:8px">{}</td></tr>'.format(html.escape(str(k)), c))
         # Sonar error-level issues count
         sonar_err_count = summary.get('errors_count') or 0
         if sonar_err_count:
-            f.write('<tr><td style="padding:8px">SOURCE CODE ERRORS</td><td style="padding:8px">{}</td></tr>'.format(sonar_err_count))
+            f.write('<tr><td style="padding:8px">SOURCE CODE - ERRORS</td><td style="padding:8px">{}</td></tr>'.format(sonar_err_count))
         f.write('</tbody></table>')
 
         f.write('<h2>Trivy Vulnerabilities</h2>')
