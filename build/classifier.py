@@ -52,7 +52,8 @@ def create_app():
 
       app = Flask(__name__)
       app.logger.setLevel(logging.DEBUG)
-      handler = KafkaHandler()
+      Producer=KafkaProducer(bootstrap_servers="kafka-external.apps.eo4eu.eu:9092",value_serializer=lambda v: json.dumps(v).encode('utf-8'),key_serializer=str.encode)
+      handler = KafkaHandler(defaultproducer=Producer)
       handler.setLevel(logging.INFO)
       filter = DefaultContextFilter()
       app.logger.addHandler(handler)
